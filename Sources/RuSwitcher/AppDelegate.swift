@@ -187,7 +187,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 let bc = self.keyboardMonitor.boundaryCount
                 if self.textConverter.convert(wordKeys: keys, prevWordKeys: prevKeys, boundaryCount: bc) {
                     self.keyboardMonitor.markConverted()
-                    LayoutSwitcher.switchToOpposite()
+                    if SettingsManager.shared.switchLayoutAfterConvert {
+                        LayoutSwitcher.switchToOpposite()
+                    }
                     self.updateStatusIcon()
                 }
             },
@@ -196,7 +198,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard SettingsManager.shared.autoSwitchEnabled else { return }
                 if self.textConverter.reconvert() {
                     self.keyboardMonitor.markConverted()
-                    LayoutSwitcher.switchToOpposite()
+                    if SettingsManager.shared.switchLayoutAfterConvert {
+                        LayoutSwitcher.switchToOpposite()
+                    }
                     self.updateStatusIcon()
                 }
             }

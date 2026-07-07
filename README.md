@@ -69,6 +69,7 @@ cp -R RuSwitcher.app /Applications/
 | triggerRightOnly | true/false | false | только правая клавиша пары |
 | triggerDoubleTap | true/false | false | двойной тап вместо одиночного |
 | autoSwitch | true/false | true | мастер-выключатель конвертации |
+| switchLayout | true/false | false | переключать системную раскладку после конвертации/отката |
 | debugLog | true/false | false | лог в ~/Library/Logs/RuSwitcher/ |
 | launchAtLogin | true/false | false | автозапуск при логине |
 | keySound | true/false | false | звук при конвертации |

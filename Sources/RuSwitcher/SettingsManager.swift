@@ -19,6 +19,7 @@ final class SettingsManager: @unchecked Sendable {
         static let triggerKey = "com.ruswitcher.triggerKey"
         static let triggerRightOnly = "com.ruswitcher.triggerRightOnly"
         static let triggerDoubleTap = "com.ruswitcher.triggerDoubleTap"
+        static let switchLayout = "com.ruswitcher.switchLayout"
         // autoConvert/remoteDesktopMode: UI и авто-логика выпилены (lite), но KeyboardMonitor
         // (ядро, не трогаем в этой задаче) читает оба флага напрямую — свойства держим live,
         // они просто остаются в дефолтном OFF и ни на что не влияют без UI-переключателя.
@@ -99,6 +100,14 @@ final class SettingsManager: @unchecked Sendable {
     var triggerDoubleTap: Bool {
         get { defaults.bool(forKey: Keys.triggerDoubleTap) }
         set { defaults.set(newValue, forKey: Keys.triggerDoubleTap) }
+    }
+
+    /// Переключать ли системную раскладку после конвертации/отката.
+    /// По умолчанию OFF: раскладка остаётся исходной (перепечатка идёт юникодом
+    /// и от активной раскладки не зависит).
+    var switchLayoutAfterConvert: Bool {
+        get { defaults.bool(forKey: Keys.switchLayout) }
+        set { defaults.set(newValue, forKey: Keys.switchLayout) }
     }
 
     /// Caps Lock как триггер требует consume-tap (чтобы подавить переключение регистра).
