@@ -42,45 +42,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsController.onTriggerChanged = { [weak self] in
             self?.reconfigureTap()
         }
-        settingsController.onAutoConvertChanged = { [weak self] _ in
-            self?.rebuildMenu()  // синхронизировать галочку в меню
-        }
-        settingsController.onRemoteDesktopChanged = { [weak self] _ in
-            self?.reconfigureTap()  // уровень tap зависит от режима
-            self?.rebuildMenu()
-        }
         settingsController.onCaretFlagChanged = { [weak self] _ in
             self?.rebuildMenu()          // синхронизировать галочку в меню
             self?.syncCaretIndicator()   // создать/снести индикатор + обновить гейт onUserInput
-        }
-    }
-
-    // MARK: - Learn-from-undo (предложить добавить слово в never-convert)
-
-    /// Последняя авто-конвертация: слово (как было набрано) + время. Если пользователь
-    /// сразу откатывает ручным триггером — предлагаем занести слово в исключения.
-    private var lastAutoConverted: (word: String, at: Date)?
-    /// Анти-наг: за сессию про одно слово спрашиваем один раз.
-    private var offeredExceptionWords: Set<String> = []
-
-    private func offerExceptionAfterUndo() {
-        guard let last = lastAutoConverted, Date().timeIntervalSince(last.at) < 8 else { return }
-        lastAutoConverted = nil
-        let word = last.word
-        let key = word.lowercased()
-        guard !offeredExceptionWords.contains(key) else { return }
-        offeredExceptionWords.insert(key)
-        guard !SettingsManager.shared.deniedWordsSet.contains(key) else { return }
-
-        let alert = NSAlert()
-        alert.messageText = L10n.learnQuestion(word)
-        alert.addButton(withTitle: L10n.learnAdd)
-        alert.addButton(withTitle: L10n.learnNotNow)
-        if alert.runModal() == .alertFirstButtonReturn {
-            var list = SettingsManager.shared.deniedWords
-            list.append(word)
-            SettingsManager.shared.deniedWords = list
-            rslog("learn: added word (len=\(word.count)) to never-convert")
         }
     }
 
@@ -257,15 +221,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             onAltTap: { [weak self] in
                 guard let self else { return }
                 guard SettingsManager.shared.autoSwitchEnabled else { return }
-                if AutoSwitchPolicy.shouldDeferToRemoteClient {
-                    // Удалёнка: текст конвертит офисный инстанс по реальным проброшенным символам
-                    // (Fix №6). А здесь меняем СВОЮ раскладку — чтобы дальнейший ввод пошёл уже
-                    // в правильной раскладке и не пришлось конвертить каждое слово.
-                    LayoutSwitcher.switchToOpposite()
-                    self.updateStatusIcon()
-                    rslog("trigger: local layout switched, conversion handled by controlled instance")
-                    return
-                }
                 let keys = self.keyboardMonitor.currentWordKeys
                 let prevKeys = self.keyboardMonitor.prevWordKeys
                 let bc = self.keyboardMonitor.boundaryCount
@@ -273,26 +228,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     self.keyboardMonitor.markConverted()
                     LayoutSwitcher.switchToOpposite()
                     self.updateStatusIcon()
-                    self.lastAutoConverted = nil
                 }
             },
             onAltReconvert: { [weak self] in
                 guard let self else { return }
                 guard SettingsManager.shared.autoSwitchEnabled else { return }
-                if AutoSwitchPolicy.shouldDeferToRemoteClient {
-                    // Удалёнка: текст конвертит офисный инстанс по реальным проброшенным символам
-                    // (Fix №6). А здесь меняем СВОЮ раскладку — чтобы дальнейший ввод пошёл уже
-                    // в правильной раскладке и не пришлось конвертить каждое слово.
-                    LayoutSwitcher.switchToOpposite()
-                    self.updateStatusIcon()
-                    rslog("trigger: local layout switched, conversion handled by controlled instance")
-                    return
-                }
                 if self.textConverter.reconvert() {
                     self.keyboardMonitor.markConverted()
                     LayoutSwitcher.switchToOpposite()
                     self.updateStatusIcon()
-                    self.offerExceptionAfterUndo()
                 }
             }
         ) {
@@ -304,9 +248,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         monitoringActive = true
-        keyboardMonitor.onWordBoundary = { [weak self] in
-            self?.handleAutoConvert()
-        }
         keyboardMonitor.onUserInput = { [weak self] in self?.caretIndicator?.userTyped() }  // issue #10
         updateStatusIcon()        // сначала выставляем флаг меню-бара, пока индикатора ещё нет
         syncCaretIndicator()      // затем создаём индикатор — без стартового ложного «попа»
@@ -323,70 +264,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             startPerAppLayout()
         }
 
-        // Предлагаем автозагрузку и автозамену при первом запуске (по разу)
+        // Предлагаем автозагрузку при первом запуске (по разу)
         offerLaunchAtLoginIfNeeded()
-        offerAutoConvertIfNeeded()
-    }
-
-    /// Авто-конвертация на границе слова: детект неправильной раскладки → конверт + смена.
-    /// Точность-first: при любой неуверенности ничего не делаем. Ручной триггер не трогаем.
-    private func handleAutoConvert() {
-        rslog("auto: fired")
-        guard SettingsManager.shared.autoSwitchEnabled else { rslog("auto: bail master-off"); return }
-        guard SettingsManager.shared.autoConvert else { rslog("auto: bail flag-off"); return }
-        guard !AutoSwitchPolicy.secureInputActive else { rslog("auto: bail secure-input"); return }
-        let frontID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        // Удалёнка: НЕ выходим сразу — прогоняем детектор по своему (чистому) буферу, и при
-        // «не той раскладке» переключаем СВОЮ раскладку (конверсию делает инстанс на той стороне).
-        let deferToRemote = SettingsManager.shared.remoteDesktopMode && AutoSwitchPolicy.isRemoteDesktopClient(frontID)
-        if AutoSwitchPolicy.isDeniedApp(frontID) { rslog("auto: bail denied-app \(frontID ?? "?")"); return }
-        if let captured = keyboardMonitor.prevWordBundleID, captured != frontID {
-            rslog("auto: bail focus-changed"); return  // фокус уехал между пробелом и сейчас
-        }
-
-        let keys = keyboardMonitor.prevWordKeys
-        let bc = keyboardMonitor.boundaryCount
-        guard !keys.isEmpty else { rslog("auto: bail empty-keys"); return }  // курсор уехал — небезопасно
-        guard let pair = DynamicKeyMapping.convertKeys(keys) else { rslog("auto: bail convertKeys-nil"); return }
-        if AutoSwitchPolicy.isDeniedWord(pair.original, pair.converted) { rslog("auto: bail denied-word"); return }
-
-        // Язык для детектора. Для проброшенного через удалёнку текста (все символы — char)
-        // направление определяем по СКРИПТУ набранного, а не по раскладке офисной машины:
-        // на офисе раскладка может не соответствовать тому, что напечатали на контроллере,
-        // и тогда decide ошибочно даёт keep (это и есть «авто в удалёнке не работает»).
-        let langs: (current: String, opposite: String)
-        if keys.allSatisfy({ $0.char != nil }) {
-            let typedIsCyrillic = pair.original.unicodeScalars.contains { $0.value >= 0x0400 && $0.value <= 0x04FF }
-            langs = typedIsCyrillic ? ("ru", "en") : ("en", "ru")
-        } else if let l = LayoutSwitcher.currentAndOppositeLanguage() {
-            langs = l
-        } else {
-            rslog("auto: bail langs-nil"); return
-        }
-
-        let capsLock = keys.contains { $0.caps }
-        let verdict = LayoutDetector.decide(typed: pair.original, converted: pair.converted,
-                                            currentLang: langs.current, otherLang: langs.opposite,
-                                            capsLock: capsLock)
-        rslog("auto: len=\(pair.original.count) \(langs.current)/\(langs.opposite) verdict=\(verdict)")  // слова не логируем (приватность)
-        guard verdict == .switchToConverted else { return }
-
-        if deferToRemote {
-            // Удалёнка: текст конвертит офисный инстанс по реальным проброшенным символам.
-            // Здесь меняем СВОЮ раскладку — чтобы дальнейший ввод пошёл уже в правильной.
-            LayoutSwitcher.switchToOpposite()
-            updateStatusIcon()
-            rslog("auto: local layout switched, conversion handled by controlled instance")
-            return
-        }
-
-        rslog("auto: convert \(keys.count) keys (+\(bc) sp)")
-        if textConverter.convert(wordKeys: [], prevWordKeys: keys, boundaryCount: bc) {
-            keyboardMonitor.markConverted()
-            LayoutSwitcher.switchToOpposite()
-            updateStatusIcon()
-            lastAutoConverted = (pair.original, Date())
-        }
     }
 
     /// Предлагает включить автозагрузку при первом запуске (один раз)
@@ -408,29 +287,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             rslog("User enabled launch at login")
         } else {
             rslog("User declined launch at login")
-        }
-    }
-
-    /// Предлагает включить автозамену при первом запуске (один раз). Фича OFF по умолчанию,
-    /// поэтому без явного предложения пользователь о ней не узнает.
-    private func offerAutoConvertIfNeeded() {
-        let settings = SettingsManager.shared
-        guard !settings.autoConvertOffered else { return }
-        settings.autoConvertOffered = true
-
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = L10n.onboardAutoConvertTitle
-        alert.informativeText = L10n.onboardAutoConvertText
-        alert.addButton(withTitle: L10n.wizardYes)
-        alert.addButton(withTitle: L10n.wizardNo)
-
-        if alert.runModal() == .alertFirstButtonReturn {
-            settings.autoConvert = true
-            rebuildMenu()  // синхронизировать галочку «Автоматическая конверсия» в меню
-            rslog("User enabled auto-convert at onboarding")
-        } else {
-            rslog("User declined auto-convert at onboarding")
         }
     }
 
@@ -483,11 +339,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         autoItem.state = SettingsManager.shared.autoSwitchEnabled ? .on : .off
         menu.addItem(autoItem)
 
-        let autoConvertItem = NSMenuItem(title: L10n.menuAutoConvert, action: #selector(toggleAutoConvert), keyEquivalent: "")
-        autoConvertItem.target = self
-        autoConvertItem.state = SettingsManager.shared.autoConvert ? .on : .off
-        menu.addItem(autoConvertItem)
-
         let keySoundItem = NSMenuItem(title: L10n.menuKeySound, action: #selector(toggleKeySound), keyEquivalent: "")
         keySoundItem.target = self
         keySoundItem.state = SettingsManager.shared.keySound ? .on : .off
@@ -503,14 +354,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         monoIconItem.target = self
         monoIconItem.state = SettingsManager.shared.monochromeIcon ? .on : .off
         menu.addItem(monoIconItem)
-
-        // Режим удалённого стола отложен в 2.5 — тумблер скрыт за флагом (для тестирования).
-        if SettingsManager.shared.showRemoteDesktopBeta {
-            let remoteDesktopItem = NSMenuItem(title: L10n.menuRemoteDesktop, action: #selector(toggleRemoteDesktop), keyEquivalent: "")
-            remoteDesktopItem.target = self
-            remoteDesktopItem.state = SettingsManager.shared.remoteDesktopMode ? .on : .off
-            menu.addItem(remoteDesktopItem)
-        }
 
         menu.addItem(NSMenuItem.separator())
 
@@ -693,11 +536,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsController.updateAutoSwitchState(enabled)
     }
 
-    @objc private func toggleAutoConvert(_ sender: NSMenuItem) {
-        SettingsManager.shared.autoConvert.toggle()
-        sender.state = SettingsManager.shared.autoConvert ? .on : .off
-    }
-
     @objc private func toggleKeySound(_ sender: NSMenuItem) {
         SettingsManager.shared.keySound.toggle()
         sender.state = SettingsManager.shared.keySound ? .on : .off
@@ -714,12 +552,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         SettingsManager.shared.monochromeIcon.toggle()
         sender.state = SettingsManager.shared.monochromeIcon ? .on : .off
         updateStatusIcon()   // перерисовать в новом стиле сразу
-    }
-
-    @objc private func toggleRemoteDesktop(_ sender: NSMenuItem) {
-        SettingsManager.shared.remoteDesktopMode.toggle()
-        sender.state = SettingsManager.shared.remoteDesktopMode ? .on : .off
-        reconfigureTap()  // уровень event tap зависит от режима
     }
 
     /// Пересоздаёт event tap и, если создание не удалось (например, session-tap отклонён),

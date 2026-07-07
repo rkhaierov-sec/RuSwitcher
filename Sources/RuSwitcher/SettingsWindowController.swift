@@ -12,15 +12,12 @@ final class SettingsWindowController {
     private var layout1Popup: NSPopUpButton?
     private var layout2Popup: NSPopUpButton?
     private var languagePopup: NSPopUpButton?
-    private var exceptionEditors: [ExceptionListEditor] = []
 
     /// Callback для обновления меню
     var onAutoSwitchChanged: ((Bool) -> Void)?
     var onPerAppLayoutChanged: ((Bool) -> Void)?
     var onLanguageChanged: (() -> Void)?
     var onTriggerChanged: (() -> Void)?
-    var onAutoConvertChanged: ((Bool) -> Void)?
-    var onRemoteDesktopChanged: ((Bool) -> Void)?
     var onCaretFlagChanged: ((Bool) -> Void)?
 
     func showWindow() {
@@ -186,19 +183,6 @@ final class SettingsWindowController {
 
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 600))
         var y: CGFloat = 586          // y — верх следующего элемента, идём сверху вниз
-        exceptionEditors.removeAll()
-
-        // Авто-конвертация
-        let autoConvert = NSButton(checkboxWithTitle: L10n.settingsAutoConvert, target: self, action: #selector(autoConvertChanged))
-        autoConvert.frame = NSRect(x: 20, y: y - 22, width: 420, height: 22)
-        autoConvert.state = SettingsManager.shared.autoConvert ? .on : .off
-        view.addSubview(autoConvert)
-        y -= 24
-        let acHint = NSTextField(wrappingLabelWithString: L10n.settingsAutoConvertHint)
-        acHint.frame = NSRect(x: 40, y: y - 32, width: 400, height: 32)
-        acHint.font = .systemFont(ofSize: 11); acHint.textColor = .secondaryLabelColor
-        view.addSubview(acHint)
-        y -= 38
 
         // Флаг у курсора (issue #10)
         let caretFlag = NSButton(checkboxWithTitle: L10n.settingsCaretFlag, target: self, action: #selector(caretFlagChanged))
@@ -212,53 +196,6 @@ final class SettingsWindowController {
         cfHint.font = .systemFont(ofSize: 11); cfHint.textColor = .secondaryLabelColor
         view.addSubview(cfHint)
         y -= 52
-
-        // Режим удалённого стола отложен в 2.5 — блок скрыт за флагом (для тестирования).
-        if SettingsManager.shared.showRemoteDesktopBeta {
-            let remote = NSButton(checkboxWithTitle: L10n.menuRemoteDesktop, target: self, action: #selector(remoteDesktopChanged))
-            remote.frame = NSRect(x: 20, y: y - 22, width: 420, height: 22)
-            remote.state = SettingsManager.shared.remoteDesktopMode ? .on : .off
-            view.addSubview(remote)
-            y -= 24
-            let rHint = NSTextField(wrappingLabelWithString: L10n.settingsRemoteDesktopHint)
-            rHint.frame = NSRect(x: 40, y: y - 44, width: 400, height: 44)
-            rHint.font = .systemFont(ofSize: 11); rHint.textColor = .secondaryLabelColor
-            view.addSubview(rHint)
-            y -= 52
-        }
-
-        // Секция: заголовок сверху, ниже — таблица с кнопками. Зазоры фиксированные,
-        // поэтому раскладка одинаково корректна на всех языках (заголовки не переносятся).
-        func addSection(_ title: String, _ editor: ExceptionListEditor) {
-            let header = NSTextField(labelWithString: title)
-            header.frame = NSRect(x: 20, y: y - 18, width: 420, height: 18)
-            header.font = .boldSystemFont(ofSize: 11)
-            header.lineBreakMode = .byTruncatingTail
-            view.addSubview(header)
-            let contH: CGFloat = 96
-            let cont = editor.makeContainer(frame: NSRect(x: 20, y: y - 22 - contH, width: 420, height: contH))
-            view.addSubview(cont)
-            exceptionEditors.append(editor)
-            y -= (22 + contH + 14)   // заголовок+зазор + таблица + зазор до следующей секции
-        }
-
-        addSection(L10n.settingsExceptionsApps, ExceptionListEditor(
-            kind: .apps,
-            get: { SettingsManager.shared.deniedApps },
-            set: { SettingsManager.shared.deniedApps = $0 },
-            isProtected: { AutoSwitchPolicy.protectedApps.contains($0) }))
-
-        addSection(L10n.settingsExceptionsNever, ExceptionListEditor(
-            kind: .words,
-            get: { SettingsManager.shared.deniedWords },
-            set: { SettingsManager.shared.deniedWords = $0 },
-            addWordPrompt: L10n.settingsAddWordPrompt))
-
-        addSection(L10n.settingsExceptionsAlways, ExceptionListEditor(
-            kind: .words,
-            get: { SettingsManager.shared.alwaysConvertWords },
-            set: { SettingsManager.shared.alwaysConvertWords = $0 },
-            addWordPrompt: L10n.settingsAddWordPrompt))
 
         item.view = view
         return item
@@ -490,18 +427,6 @@ final class SettingsWindowController {
     @objc private func triggerDoubleTapChanged(_ sender: NSButton) {
         SettingsManager.shared.triggerDoubleTap = sender.state == .on
         onTriggerChanged?()
-    }
-
-    @objc private func autoConvertChanged(_ sender: NSButton) {
-        let enabled = sender.state == .on
-        SettingsManager.shared.autoConvert = enabled
-        onAutoConvertChanged?(enabled)
-    }
-
-    @objc private func remoteDesktopChanged(_ sender: NSButton) {
-        let enabled = sender.state == .on
-        SettingsManager.shared.remoteDesktopMode = enabled
-        onRemoteDesktopChanged?(enabled)
     }
 
     @objc private func caretFlagChanged(_ sender: NSButton) {
