@@ -2,11 +2,10 @@ import AppKit
 import ApplicationServices
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private let keyboardMonitor = KeyboardMonitor()
     private let textConverter = TextConverter()
-    private let settingsController = SettingsWindowController()
     private var permissionCheckTimer: Timer?
     private var iconRefreshTimer: Timer?
     private var monitoringActive = false
@@ -15,23 +14,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupStatusItem()
-        setupSettingsCallbacks()
         syncLoginItem()
         runPermissionWizard()
-    }
-
-    private func setupSettingsCallbacks() {
-        settingsController.onAutoSwitchChanged = { [weak self] _ in
-            // Не адресуем пункт по индексу: с 2.5.0 item(at: 0) — строка версии, а со списком
-            // раскладок индексы вообще динамические. Пересборка — как у соседних колбэков.
-            self?.rebuildMenu()
-        }
-        settingsController.onLanguageChanged = { [weak self] in
-            self?.rebuildMenu()
-        }
-        settingsController.onTriggerChanged = { [weak self] in
-            self?.reconfigureTap()
-        }
     }
 
     // MARK: - Login Item Sync
@@ -234,31 +218,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor in self?.updateStatusIcon() }
         }
         rslog("Monitoring started successfully")
-
-        // Предлагаем автозагрузку при первом запуске (по разу)
-        offerLaunchAtLoginIfNeeded()
-    }
-
-    /// Предлагает включить автозагрузку при первом запуске (один раз)
-    private func offerLaunchAtLoginIfNeeded() {
-        let settings = SettingsManager.shared
-        guard !settings.launchAtLoginAsked else { return }
-        settings.launchAtLoginAsked = true
-
-        let alert = NSAlert()
-        alert.alertStyle = .informational
-        alert.messageText = L10n.wizardLaunchAtLoginTitle
-        alert.informativeText = L10n.wizardLaunchAtLoginText
-        alert.addButton(withTitle: L10n.wizardYes)
-        alert.addButton(withTitle: L10n.wizardNo)
-
-        let response = alert.runModal()
-        if response == .alertFirstButtonReturn {
-            settings.launchAtLogin = true
-            rslog("User enabled launch at login")
-        } else {
-            rslog("User declined launch at login")
-        }
     }
 
     // MARK: - Status Item
@@ -287,22 +246,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         keyboardMonitor.soundArmed = true  // issue #7: следующая буква даст звук раскладки
     }
 
-    /// Собирает меню статус-бара. Вызывается заново при смене языка интерфейса,
-    /// иначе пункты меню остаются на старом языке.
     private func rebuildMenu() {
         let menu = NSMenu()
 
-        // Строка версии (с dev-меткой для непубликуемых сборок) — чтобы было видно, какой билд.
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
-        let devTag = Bundle.main.infoDictionary?["RSDevTag"] as? String ?? ""
-        let verItem = NSMenuItem(title: "RuSwitcher \(ver)\(devTag)", action: nil, keyEquivalent: "")
+        let verItem = NSMenuItem(title: "RuSwitcher lite \(ver)", action: nil, keyEquivalent: "")
         verItem.isEnabled = false
         menu.addItem(verItem)
-        menu.addItem(NSMenuItem.separator())
-
-        // Список раскладок как в системном меню ввода: флаг + имя, галочка на текущей,
-        // клик — переключение. Актуализируется в menuWillOpen при каждом открытии.
-        for item in layoutMenuItems() { menu.addItem(item) }
         menu.addItem(NSMenuItem.separator())
 
         let autoItem = NSMenuItem(title: L10n.menuAutoSwitch, action: #selector(toggleAutoSwitch), keyEquivalent: "")
@@ -310,36 +260,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         autoItem.state = SettingsManager.shared.autoSwitchEnabled ? .on : .off
         menu.addItem(autoItem)
 
-        let keySoundItem = NSMenuItem(title: L10n.menuKeySound, action: #selector(toggleKeySound), keyEquivalent: "")
-        keySoundItem.target = self
-        keySoundItem.state = SettingsManager.shared.keySound ? .on : .off
-        menu.addItem(keySoundItem)
-
-        // Единый стиль меню-бара (Sequoia): монохромная плашка вместо цветного флага.
-        let monoIconItem = NSMenuItem(title: L10n.menuMonoIcon, action: #selector(toggleMonoIcon), keyEquivalent: "")
-        monoIconItem.target = self
-        monoIconItem.state = SettingsManager.shared.monochromeIcon ? .on : .off
-        menu.addItem(monoIconItem)
-
-        menu.addItem(NSMenuItem.separator())
-
         let permItem = NSMenuItem(title: L10n.menuCheckPermissions, action: #selector(recheckPermissions), keyEquivalent: "")
         permItem.target = self
         menu.addItem(permItem)
-
-        let settingsItem = NSMenuItem(title: L10n.menuSettings, action: #selector(openSettings), keyEquivalent: ",")
-        settingsItem.target = self
-        menu.addItem(settingsItem)
-
-        menu.addItem(NSMenuItem.separator())
-
-        let donateItem = NSMenuItem(title: L10n.menuDonate, action: #selector(openDonate), keyEquivalent: "")
-        donateItem.target = self
-        menu.addItem(donateItem)
-
-        let starItem = NSMenuItem(title: L10n.menuStarOnGithub, action: #selector(openGitHub), keyEquivalent: "")
-        starItem.target = self
-        menu.addItem(starItem)
 
         menu.addItem(NSMenuItem.separator())
 
@@ -347,52 +270,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        menu.delegate = self
         statusItem.menu = menu
-        rslog("Menu (re)built with \(menu.items.count) items")
-    }
-
-    // MARK: - Layout list in menu
-
-    /// Метка пунктов-раскладок, чтобы находить и обновлять их группу в меню.
-    private static let layoutItemTag = 741
-
-    /// Пункты списка раскладок: «флаг + локализованное имя», галочка на текущей.
-    private func layoutMenuItems() -> [NSMenuItem] {
-        let currentID = LayoutSwitcher.currentLayoutID()
-        return LayoutSwitcher.installedLayouts().map { source in
-            let id = LayoutSwitcher.sourceID(source)
-            let badge = LayoutSwitcher.languageCode(source).map(Self.flagBadge(forLanguage:))
-            let title = [badge, LayoutSwitcher.sourceName(source)].compactMap { $0 }.joined(separator: " ")
-            let item = NSMenuItem(title: title, action: #selector(selectLayout(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = id
-            item.state = (id == currentID) ? .on : .off
-            item.tag = Self.layoutItemTag
-            return item
-        }
-    }
-
-    /// Пересобирает группу раскладок при каждом открытии меню: состав и галочка должны
-    /// отражать систему на момент клика (раскладки добавляют/удаляют в настройках ОС,
-    /// а текущую меняют и мимо нас — системным хоткеем).
-    func menuWillOpen(_ menu: NSMenu) {
-        guard menu === statusItem.menu else { return }
-        let insertAt = menu.items.firstIndex { $0.tag == Self.layoutItemTag } ?? 2
-        for old in menu.items where old.tag == Self.layoutItemTag { menu.removeItem(old) }
-        for (offset, item) in layoutMenuItems().enumerated() {
-            menu.insertItem(item, at: insertAt + offset)
-        }
-    }
-
-    @objc private func selectLayout(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String,
-              id != LayoutSwitcher.currentLayoutID() else { return }
-        LayoutSwitcher.switchTo(layoutID: id)
-        // Явная смена раскладки делает набранный буфер неактуальным — как при per-app restore.
-        keyboardMonitor.markConverted()
-        textConverter.clearState()
-        updateStatusIcon()
     }
 
     func updateStatusIcon() {
@@ -480,48 +358,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         SettingsManager.shared.autoSwitchEnabled.toggle()
         let enabled = SettingsManager.shared.autoSwitchEnabled
         sender.state = enabled ? .on : .off
-        settingsController.updateAutoSwitchState(enabled)
-    }
-
-    @objc private func toggleKeySound(_ sender: NSMenuItem) {
-        SettingsManager.shared.keySound.toggle()
-        sender.state = SettingsManager.shared.keySound ? .on : .off
-    }
-
-    @objc private func toggleMonoIcon(_ sender: NSMenuItem) {
-        SettingsManager.shared.monochromeIcon.toggle()
-        sender.state = SettingsManager.shared.monochromeIcon ? .on : .off
-        updateStatusIcon()   // перерисовать в новом стиле сразу
-    }
-
-    /// Пересоздаёт event tap и, если создание не удалось (например, session-tap отклонён),
-    /// ретраит — иначе тумблер «вкл», а tap'а нет, и приложение молча не реагирует на триггер.
-    private func reconfigureTap() {
-        guard !keyboardMonitor.reconfigure() else { return }
-        rslog("reconfigure failed (tap denied) — retry in 3s")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-            if self?.keyboardMonitor.reconfigure() == false { rslog("reconfigure retry failed") }
-        }
     }
 
     @objc private func recheckPermissions() {
         runPermissionWizard(interactive: true)
-    }
-
-    @objc private func openSettings() {
-        settingsController.showWindow()
-    }
-
-    @objc private func openDonate() {
-        if let url = URL(string: SettingsManager.shared.donateURL) {
-            NSWorkspace.shared.open(url)
-        }
-    }
-
-    @objc private func openGitHub() {
-        if let url = URL(string: SettingsManager.githubURL) {
-            NSWorkspace.shared.open(url)
-        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {

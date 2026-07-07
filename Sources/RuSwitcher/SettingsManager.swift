@@ -16,7 +16,6 @@ final class SettingsManager: @unchecked Sendable {
         static let launchAtLogin = "com.ruswitcher.launchAtLogin"
         static let interfaceLanguage = "com.ruswitcher.interfaceLanguage"
         static let permissionsWereGranted = "com.ruswitcher.permissionsWereGranted"
-        static let launchAtLoginAsked = "com.ruswitcher.launchAtLoginAsked"
         static let triggerKey = "com.ruswitcher.triggerKey"
         static let triggerRightOnly = "com.ruswitcher.triggerRightOnly"
         static let triggerDoubleTap = "com.ruswitcher.triggerDoubleTap"
@@ -81,11 +80,6 @@ final class SettingsManager: @unchecked Sendable {
         set { defaults.set(newValue, forKey: Keys.permissionsWereGranted) }
     }
 
-    var launchAtLoginAsked: Bool {
-        get { defaults.bool(forKey: Keys.launchAtLoginAsked) }
-        set { defaults.set(newValue, forKey: Keys.launchAtLoginAsked) }
-    }
-
     // MARK: - Триггер конвертации
 
     /// Клавиша-триггер: "option" | "command" | "control" | "shift" | "capsLock".
@@ -136,15 +130,6 @@ final class SettingsManager: @unchecked Sendable {
         get { defaults.bool(forKey: Keys.monochromeIcon) }
         set { defaults.set(newValue, forKey: Keys.monochromeIcon) }
     }
-
-    var donateURL: String { "https://boosty.to/ruswitcher" }
-    var contactEmail: String { "xrashid@gmail.com" }
-
-    // MARK: - GitHub coordinates (единственный источник — чтобы при переименовании
-    // репозитория правка была в одном месте)
-    static let githubOwner = "rashn"
-    static let githubRepo = "RuSwitcher"
-    static var githubURL: String { "https://github.com/\(githubOwner)/\(githubRepo)" }
 
     // MARK: - Login Item
 
