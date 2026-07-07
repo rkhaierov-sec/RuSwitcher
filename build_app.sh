@@ -6,21 +6,8 @@ APP_NAME="RuSwitcher"
 APP_BUNDLE="$PROJECT_DIR/$APP_NAME.app"
 # Universal-сборка кладёт продукт сюда (а не в .build/release)
 BUILD_DIR="$PROJECT_DIR/.build/apple/Products/Release"
-VERSION_JSON="$PROJECT_DIR/version.json"
 
-# version.json — единый источник правды. Значения в Info.plist в репо
-# игнорируются: скрипт штампует CFBundleShortVersionString и CFBundleVersion
-# в копию Info.plist внутри собранного бандла.
-SHORT_VERSION=$(/usr/bin/python3 -c "import json,sys;print(json.load(open('$VERSION_JSON'))['version'])")
-BUILD_VERSION=$(/usr/bin/python3 -c "import json,sys;print(json.load(open('$VERSION_JSON')).get('build','1'))")
-DEV_TAG=$(/usr/bin/python3 -c "import json,sys;print(json.load(open('$VERSION_JSON')).get('dev',''))")
-
-if [ -z "$SHORT_VERSION" ]; then
-    echo "ERROR: could not read version from $VERSION_JSON"
-    exit 1
-fi
-
-echo "=== Building $APP_NAME v$SHORT_VERSION (build $BUILD_VERSION) ==="
+echo "=== Building $APP_NAME ==="
 
 # 1. Собираем release — universal (arm64 + x86_64), чтобы работало и на Intel-маках
 echo "→ swift build -c release --arch arm64 --arch x86_64 (universal)..."
@@ -43,14 +30,8 @@ if [[ "$ARCHS" != *"arm64"* || "$ARCHS" != *"x86_64"* ]]; then
 fi
 echo "→ Universal OK: $ARCHS"
 
-# 4. Копируем Info.plist и штампуем версию из version.json
+# 4. Копируем Info.plist (версия берётся напрямую из файла в репо)
 cp "$PROJECT_DIR/Info.plist" "$APP_BUNDLE/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $SHORT_VERSION" "$APP_BUNDLE/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_VERSION" "$APP_BUNDLE/Contents/Info.plist"
-# Dev-метка (буква) для непубликуемых сборок — пусто для релиза. Показывается в About/меню.
-/usr/libexec/PlistBuddy -c "Set :RSDevTag $DEV_TAG" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null \
-  || /usr/libexec/PlistBuddy -c "Add :RSDevTag string $DEV_TAG" "$APP_BUNDLE/Contents/Info.plist"
-echo "→ Stamped Info.plist: CFBundleShortVersionString=$SHORT_VERSION$DEV_TAG CFBundleVersion=$BUILD_VERSION"
 
 # 5. Копируем иконку
 cp "$PROJECT_DIR/RuSwitcher.icns" "$APP_BUNDLE/Contents/Resources/RuSwitcher.icns"
