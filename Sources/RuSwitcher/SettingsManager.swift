@@ -215,12 +215,6 @@ final class SettingsManager: @unchecked Sendable {
     static let githubOwner = "rashn"
     static let githubRepo = "RuSwitcher"
     static var githubURL: String { "https://github.com/\(githubOwner)/\(githubRepo)" }
-    /// Team ID (Apple Developer), которым подписаны релизы. Используется для
-    /// пиннинга подписи при авто-обновлении.
-    static let developerTeamID = "9GEWCZ59HK"
-    static func releaseDMGURL(version: String) -> String {
-        "\(githubURL)/releases/download/v\(version)/\(githubRepo)-\(version).dmg"
-    }
 
     // MARK: - Login Item
 
