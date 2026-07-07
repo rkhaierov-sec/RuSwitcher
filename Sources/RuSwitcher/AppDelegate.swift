@@ -10,7 +10,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let perAppLayoutManager = PerAppLayoutManager()
     private var permissionCheckTimer: Timer?
     private var iconRefreshTimer: Timer?
-    private var updateCheckTimer: Timer?   // периодическая авто-проверка обновлений, пока приложение работает
     private var monitoringActive = false
     private var caretIndicator: CaretIndicator?   // issue #10: флаг у каретки (бета, по умолчанию OFF)
     private var lastFlagShown: String?            // идентичность раскладки для детекта смены (не title!)
@@ -21,13 +20,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupSettingsCallbacks()
         syncLoginItem()
         runPermissionWizard()
-        UpdateChecker.checkOnLaunch()
-        // Периодическая авто-проверка обновлений, пока приложение работает (не только на старте).
-        // Тикает каждые 6ч; сам запрос к GitHub не чаще раза в сутки (троттл в UpdateChecker) и
-        // уважает настройку «Автоматически проверять обновления» (её можно снять, чтобы отключить).
-        updateCheckTimer = Timer.scheduledTimer(withTimeInterval: 6 * 3600, repeats: true) { _ in
-            Task { @MainActor in UpdateChecker.checkPeriodic() }
-        }
     }
 
     private func setupSettingsCallbacks() {
@@ -530,10 +522,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
-        let updateItem = NSMenuItem(title: L10n.menuCheckUpdates, action: #selector(checkUpdates), keyEquivalent: "")
-        updateItem.target = self
-        menu.addItem(updateItem)
-
         menu.addItem(NSMenuItem.separator())
 
         let donateItem = NSMenuItem(title: L10n.menuDonate, action: #selector(openDonate), keyEquivalent: "")
@@ -750,10 +738,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func openSettings() {
         settingsController.showWindow()
-    }
-
-    @objc private func checkUpdates() {
-        UpdateChecker.checkNow()
     }
 
     @objc private func openDonate() {

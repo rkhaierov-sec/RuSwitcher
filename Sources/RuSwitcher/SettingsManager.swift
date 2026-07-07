@@ -13,10 +13,7 @@ final class SettingsManager: @unchecked Sendable {
         static let layout1ID = "com.ruswitcher.layout1ID"
         static let layout2ID = "com.ruswitcher.layout2ID"
         static let debugLog = "com.ruswitcher.debugLog"
-        static let skippedVersion = "com.ruswitcher.skippedVersion"
-        static let lastUpdateCheck = "com.ruswitcher.lastUpdateCheck"
         static let launchAtLogin = "com.ruswitcher.launchAtLogin"
-        static let checkUpdatesEnabled = "com.ruswitcher.checkUpdatesEnabled"
         static let interfaceLanguage = "com.ruswitcher.interfaceLanguage"
         static let permissionsWereGranted = "com.ruswitcher.permissionsWereGranted"
         static let launchAtLoginAsked = "com.ruswitcher.launchAtLoginAsked"
@@ -63,16 +60,6 @@ final class SettingsManager: @unchecked Sendable {
         set { defaults.set(newValue, forKey: Keys.debugLog) }
     }
 
-    var skippedVersion: String {
-        get { defaults.string(forKey: Keys.skippedVersion) ?? "" }
-        set { defaults.set(newValue, forKey: Keys.skippedVersion) }
-    }
-
-    var lastUpdateCheck: Date? {
-        get { defaults.object(forKey: Keys.lastUpdateCheck) as? Date }
-        set { defaults.set(newValue, forKey: Keys.lastUpdateCheck) }
-    }
-
     var launchAtLogin: Bool {
         get { defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false }
         set {
@@ -82,13 +69,6 @@ final class SettingsManager: @unchecked Sendable {
                 self.doUpdateLoginItem(enabled: enabled)
             }
         }
-    }
-
-    /// Авто-проверка обновлений при запуске (дефолт: включено).
-    /// На ручную проверку через меню не влияет.
-    var checkUpdatesEnabled: Bool {
-        get { defaults.object(forKey: Keys.checkUpdatesEnabled) as? Bool ?? true }
-        set { defaults.set(newValue, forKey: Keys.checkUpdatesEnabled) }
     }
 
     /// Язык интерфейса (пустая строка = авто-определение по системе)

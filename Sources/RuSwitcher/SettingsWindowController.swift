@@ -7,7 +7,6 @@ final class SettingsWindowController {
     private var window: NSWindow?
     private var autoSwitchCheckbox: NSButton?
     private var launchAtLoginCheckbox: NSButton?
-    private var checkUpdatesCheckbox: NSButton?
     private var debugLogCheckbox: NSButton?
     private var caretFlagCheckbox: NSButton?
     private var layout1Popup: NSPopUpButton?
@@ -128,23 +127,6 @@ final class SettingsWindowController {
         perAppCheckbox.state = SettingsManager.shared.perAppLayout ? .on : .off
         view.addSubview(perAppCheckbox)
         y -= 30
-
-        // Авто-проверка обновлений
-        let updCheckbox = NSButton(checkboxWithTitle: L10n.settingsCheckUpdates,
-                                   target: self, action: #selector(checkUpdatesEnabledChanged))
-        updCheckbox.frame = NSRect(x: 20, y: y, width: 420, height: 22)
-        updCheckbox.state = SettingsManager.shared.checkUpdatesEnabled ? .on : .off
-        updCheckbox.toolTip = L10n.settingsCheckUpdatesHint
-        view.addSubview(updCheckbox)
-        checkUpdatesCheckbox = updCheckbox
-        y -= 18
-
-        let updHint = NSTextField(wrappingLabelWithString: L10n.settingsCheckUpdatesHint)
-        updHint.frame = NSRect(x: 40, y: y - 18, width: 400, height: 32)
-        updHint.font = .systemFont(ofSize: 11)
-        updHint.textColor = .secondaryLabelColor
-        view.addSubview(updHint)
-        y -= 40
 
         // Язык интерфейса
         let langLabel = NSTextField(labelWithString: L10n.settingsLanguage)
@@ -327,12 +309,6 @@ final class SettingsWindowController {
         view.addSubview(contactBtn)
         y -= 40
 
-        // Проверить обновления
-        let updateBtn = NSButton(title: L10n.menuCheckUpdates, target: self, action: #selector(checkUpdates))
-        updateBtn.frame = NSRect(x: 20, y: y, width: 200, height: 32)
-        updateBtn.bezelStyle = .rounded
-        view.addSubview(updateBtn)
-
         item.view = view
         return item
     }
@@ -475,10 +451,6 @@ final class SettingsWindowController {
         SettingsManager.shared.launchAtLogin = sender.state == .on
     }
 
-    @objc private func checkUpdatesEnabledChanged(_ sender: NSButton) {
-        SettingsManager.shared.checkUpdatesEnabled = sender.state == .on
-    }
-
     @objc private func languageChanged(_ sender: NSPopUpButton) {
         let langCode = (sender.selectedItem?.representedObject as? String) ?? ""
         SettingsManager.shared.interfaceLanguage = langCode  // вызывает L10n.reloadLanguage()
@@ -560,10 +532,6 @@ final class SettingsWindowController {
         if let url = URL(string: "mailto:\(email)?subject=\(subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? subject)") {
             NSWorkspace.shared.open(url)
         }
-    }
-
-    @objc private func checkUpdates() {
-        UpdateChecker.checkNow()
     }
 
     @objc private func showLogFile() {
