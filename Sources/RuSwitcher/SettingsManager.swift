@@ -17,7 +17,6 @@ final class SettingsManager: @unchecked Sendable {
         static let interfaceLanguage = "com.ruswitcher.interfaceLanguage"
         static let permissionsWereGranted = "com.ruswitcher.permissionsWereGranted"
         static let launchAtLoginAsked = "com.ruswitcher.launchAtLoginAsked"
-        static let perAppLayout = "com.ruswitcher.perAppLayout"
         static let triggerKey = "com.ruswitcher.triggerKey"
         static let triggerRightOnly = "com.ruswitcher.triggerRightOnly"
         static let triggerDoubleTap = "com.ruswitcher.triggerDoubleTap"
@@ -85,11 +84,6 @@ final class SettingsManager: @unchecked Sendable {
     var launchAtLoginAsked: Bool {
         get { defaults.bool(forKey: Keys.launchAtLoginAsked) }
         set { defaults.set(newValue, forKey: Keys.launchAtLoginAsked) }
-    }
-
-    var perAppLayout: Bool {
-        get { defaults.bool(forKey: Keys.perAppLayout) }
-        set { defaults.set(newValue, forKey: Keys.perAppLayout) }
     }
 
     // MARK: - Триггер конвертации

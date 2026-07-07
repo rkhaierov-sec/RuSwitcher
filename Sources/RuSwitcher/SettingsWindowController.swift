@@ -14,7 +14,6 @@ final class SettingsWindowController {
 
     /// Callback для обновления меню
     var onAutoSwitchChanged: ((Bool) -> Void)?
-    var onPerAppLayoutChanged: ((Bool) -> Void)?
     var onLanguageChanged: (() -> Void)?
     var onTriggerChanged: (() -> Void)?
 
@@ -109,13 +108,6 @@ final class SettingsWindowController {
         loginCheckbox.state = SettingsManager.shared.launchAtLogin ? .on : .off
         view.addSubview(loginCheckbox)
         launchAtLoginCheckbox = loginCheckbox
-        y -= 30
-
-        // Запоминание раскладки по приложению
-        let perAppCheckbox = NSButton(checkboxWithTitle: L10n.settingsPerAppLayout, target: self, action: #selector(perAppLayoutChanged))
-        perAppCheckbox.frame = NSRect(x: 20, y: y, width: 420, height: 22)
-        perAppCheckbox.state = SettingsManager.shared.perAppLayout ? .on : .off
-        view.addSubview(perAppCheckbox)
         y -= 30
 
         // Язык интерфейса
@@ -385,12 +377,6 @@ final class SettingsWindowController {
     @objc private func layout2Changed(_ sender: NSPopUpButton) {
         SettingsManager.shared.layout2ID = selectedLayoutID(from: sender)
         DynamicKeyMapping.clearCache()
-    }
-
-    @objc private func perAppLayoutChanged(_ sender: NSButton) {
-        let enabled = sender.state == .on
-        SettingsManager.shared.perAppLayout = enabled
-        onPerAppLayoutChanged?(enabled)
     }
 
     @objc private func triggerChanged(_ sender: NSPopUpButton) {

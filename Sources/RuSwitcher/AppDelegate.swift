@@ -7,7 +7,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let keyboardMonitor = KeyboardMonitor()
     private let textConverter = TextConverter()
     private let settingsController = SettingsWindowController()
-    private let perAppLayoutManager = PerAppLayoutManager()
     private var permissionCheckTimer: Timer?
     private var iconRefreshTimer: Timer?
     private var monitoringActive = false
@@ -27,29 +26,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // раскладок индексы вообще динамические. Пересборка — как у соседних колбэков.
             self?.rebuildMenu()
         }
-        settingsController.onPerAppLayoutChanged = { [weak self] enabled in
-            guard let self else { return }
-            if enabled {
-                self.startPerAppLayout()
-            } else {
-                self.perAppLayoutManager.stop()
-            }
-        }
         settingsController.onLanguageChanged = { [weak self] in
             self?.rebuildMenu()
         }
         settingsController.onTriggerChanged = { [weak self] in
             self?.reconfigureTap()
         }
-    }
-
-    private func startPerAppLayout() {
-        perAppLayoutManager.onLayoutRestored = { [weak self] in
-            self?.keyboardMonitor.markConverted()
-            self?.textConverter.clearState()
-            self?.updateStatusIcon()
-        }
-        perAppLayoutManager.start()
     }
 
     // MARK: - Login Item Sync
@@ -252,10 +234,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor in self?.updateStatusIcon() }
         }
         rslog("Monitoring started successfully")
-
-        if SettingsManager.shared.perAppLayout {
-            startPerAppLayout()
-        }
 
         // Предлагаем автозагрузку при первом запуске (по разу)
         offerLaunchAtLoginIfNeeded()
@@ -554,7 +532,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @objc private func quit() {
         textConverter.flushPendingClipboardRestore()
-        perAppLayoutManager.stop()
         keyboardMonitor.stop()
         NSApplication.shared.terminate(nil)
     }
