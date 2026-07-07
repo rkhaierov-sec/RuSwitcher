@@ -55,7 +55,7 @@ cp -R RuSwitcher.app /Applications/
 
 При первом запуске macOS запросит:
 
-1. **Accessibility** — для чтения и модификации текста в приложениях.
+1. **Accessibility** — для отправки CGEvent (Backspace + юникод-вставка) при перепечатке слова.
 2. **Input Monitoring** — для отслеживания нажатий клавиш.
 
 ## Конфигурация
@@ -88,7 +88,7 @@ cp -R RuSwitcher.app /Applications/
 - `UCKeyTranslate` (Carbon) для маппинга символов между любой парой раскладок.
 - `CGEvent.keyboardSetUnicodeString` для прямой печати сконвертированного текста — без буфера
   обмена.
-- `AXUIElement` API для определения сфокусированного элемента.
+- `AXIsProcessTrusted` для проверки разрешения Accessibility.
 - `SMAppService` для управления автозапуском.
 
 ## Лицензия

@@ -1,5 +1,3 @@
-import AppKit
-import ApplicationServices
 import CoreGraphics
 
 /// Конвертация текста между раскладками
@@ -84,16 +82,6 @@ final class TextConverter {
         }
         return true
     }
-
-    func clearState() {
-        lastOriginal = ""
-        lastConverted = ""
-    }
-
-    /// No-op: clipboard-движок убран в lite-версии, восстанавливать буфер обмена
-    /// больше не нужно. Сигнатура сохранена — вызывается из AppDelegate при
-    /// завершении приложения.
-    func flushPendingClipboardRestore() {}
 
     // MARK: - Private
 

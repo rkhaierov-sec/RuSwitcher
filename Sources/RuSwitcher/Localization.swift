@@ -13,28 +13,6 @@ enum L10n {
     static var permissionsOkTitle: String { s("wizard.permissionsOk.title") }
     static var permissionsOkText: String { s("wizard.permissionsOk.text") }
 
-    // MARK: - Language names (для выпадающего списка)
-
-    /// Названия языков на их родном языке
-    static let languageNames: [(code: String, name: String)] = [
-        ("en", "English"),
-        ("ru", "Русский"),
-        ("uk", "Українська"),
-        ("be", "Беларуская"),
-        ("de", "Deutsch"),
-        ("fr", "Français"),
-        ("es", "Español"),
-        ("pt", "Português"),
-        ("pl", "Polski"),
-        ("zh", "中文"),
-        ("ja", "日本語"),
-        ("ko", "한국어"),
-        ("el", "Ελληνικά"),
-        ("bg", "Български"),
-        ("hy", "Հայերեն"),
-        ("ka", "ქართული"),
-    ]
-
     // MARK: - Private
 
     nonisolated(unsafe) private static var currentLang: String = detectLanguage()

@@ -365,13 +365,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        // Не теряем буфер обмена в 2-секундном окне отложенного восстановления
-        // (актуально и при само-обновлении, которое завершает процесс).
-        textConverter.flushPendingClipboardRestore()
     }
 
     @objc private func quit() {
-        textConverter.flushPendingClipboardRestore()
         keyboardMonitor.stop()
         NSApplication.shared.terminate(nil)
     }
