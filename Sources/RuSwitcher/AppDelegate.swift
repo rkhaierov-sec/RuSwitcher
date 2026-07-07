@@ -11,7 +11,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var permissionCheckTimer: Timer?
     private var iconRefreshTimer: Timer?
     private var monitoringActive = false
-    private var caretIndicator: CaretIndicator?   // issue #10: флаг у каретки (бета, по умолчанию OFF)
     private var lastFlagShown: String?            // идентичность раскладки для детекта смены (не title!)
     private var badgeCache: [String: NSImage] = [:]  // монохромные плашки, чтобы не перерисовывать 2с-опросом
 
@@ -41,10 +40,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         settingsController.onTriggerChanged = { [weak self] in
             self?.reconfigureTap()
-        }
-        settingsController.onCaretFlagChanged = { [weak self] _ in
-            self?.rebuildMenu()          // синхронизировать галочку в меню
-            self?.syncCaretIndicator()   // создать/снести индикатор + обновить гейт onUserInput
         }
     }
 
@@ -248,9 +243,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         monitoringActive = true
-        keyboardMonitor.onUserInput = { [weak self] in self?.caretIndicator?.userTyped() }  // issue #10
-        updateStatusIcon()        // сначала выставляем флаг меню-бара, пока индикатора ещё нет
-        syncCaretIndicator()      // затем создаём индикатор — без стартового ложного «попа»
+        updateStatusIcon()
         // Страховка к issue #9: системное уведомление о смене раскладки ненадёжно
         // (особенно через удалённый стол — на той машине оно часто не доходит), поэтому
         // флаг «застревает». Постоянный лёгкий опрос держит иконку в синхроне с системой.
@@ -344,11 +337,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         keySoundItem.state = SettingsManager.shared.keySound ? .on : .off
         menu.addItem(keySoundItem)
 
-        let caretFlagItem = NSMenuItem(title: L10n.menuCaretFlag, action: #selector(toggleCaretFlag), keyEquivalent: "")
-        caretFlagItem.target = self
-        caretFlagItem.state = SettingsManager.shared.caretFlag ? .on : .off
-        menu.addItem(caretFlagItem)
-
         // Единый стиль меню-бара (Sequoia): монохромная плашка вместо цветного флага.
         let monoIconItem = NSMenuItem(title: L10n.menuMonoIcon, action: #selector(toggleMonoIcon), keyEquivalent: "")
         monoIconItem.target = self
@@ -431,10 +419,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func updateStatusIcon() {
         let flag = flagForCurrentLayout()
-        // Каретку дёргаем ТОЛЬКО при реальной смене раскладки: updateStatusIcon зовётся ещё и
-        // 2-секундным опросом-страховкой, иначе флаг у каретки выскакивал бы каждые 2с.
-        // Сравниваем по флагу-идентичности, а не по title — в монохромном режиме title пуст.
-        let changed = lastFlagShown != flag
+        // Сравниваем и запоминаем по флагу-идентичности, а не по title — в монохромном
+        // режиме title пуст. updateStatusIcon зовётся ещё и 2-секундным опросом-страховкой.
         lastFlagShown = flag
         if SettingsManager.shared.monochromeIcon {
             statusItem.button?.title = ""
@@ -443,7 +429,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             statusItem.button?.image = nil
             statusItem.button?.title = flag
         }
-        if changed { caretIndicator?.layoutChanged() }
     }
 
     /// Подпись монохромной плашки — родная аббревиатура языка, как у системного индикатора.
@@ -511,22 +496,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return flags[code] ?? code.uppercased()
     }
 
-    /// issue #10: создаёт/освобождает индикатор каретки по флагу настроек. Создаётся лениво,
-    /// только когда фича включена И мониторинг запущен (нужны разрешения).
-    private func syncCaretIndicator() {
-        keyboardMonitor.caretFlagEnabled = SettingsManager.shared.caretFlag   // гейт диспатча onUserInput
-        if SettingsManager.shared.caretFlag, monitoringActive {
-            if caretIndicator == nil {
-                let ci = CaretIndicator()
-                ci.flagProvider = { [weak self] in self?.flagForCurrentLayout() ?? "" }
-                caretIndicator = ci
-            }
-        } else {
-            caretIndicator?.teardown()
-            caretIndicator = nil
-        }
-    }
-
     // MARK: - Actions
 
     @objc private func toggleAutoSwitch(_ sender: NSMenuItem) {
@@ -539,13 +508,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func toggleKeySound(_ sender: NSMenuItem) {
         SettingsManager.shared.keySound.toggle()
         sender.state = SettingsManager.shared.keySound ? .on : .off
-    }
-
-    @objc private func toggleCaretFlag(_ sender: NSMenuItem) {
-        SettingsManager.shared.caretFlag.toggle()
-        sender.state = SettingsManager.shared.caretFlag ? .on : .off
-        settingsController.updateCaretFlagState(SettingsManager.shared.caretFlag)
-        syncCaretIndicator()   // создать/снести индикатор и обновить гейт onUserInput
     }
 
     @objc private func toggleMonoIcon(_ sender: NSMenuItem) {

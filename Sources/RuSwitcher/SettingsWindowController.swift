@@ -8,7 +8,6 @@ final class SettingsWindowController {
     private var autoSwitchCheckbox: NSButton?
     private var launchAtLoginCheckbox: NSButton?
     private var debugLogCheckbox: NSButton?
-    private var caretFlagCheckbox: NSButton?
     private var layout1Popup: NSPopUpButton?
     private var layout2Popup: NSPopUpButton?
     private var languagePopup: NSPopUpButton?
@@ -18,7 +17,6 @@ final class SettingsWindowController {
     var onPerAppLayoutChanged: ((Bool) -> Void)?
     var onLanguageChanged: (() -> Void)?
     var onTriggerChanged: (() -> Void)?
-    var onCaretFlagChanged: ((Bool) -> Void)?
 
     func showWindow() {
         if let window {
@@ -55,11 +53,6 @@ final class SettingsWindowController {
     /// Обновить состояние чекбокса автопереключения извне
     func updateAutoSwitchState(_ enabled: Bool) {
         autoSwitchCheckbox?.state = enabled ? .on : .off
-    }
-
-    /// Обновить чекбокс «флаг у курсора» извне (когда переключили из меню)
-    func updateCaretFlagState(_ enabled: Bool) {
-        caretFlagCheckbox?.state = enabled ? .on : .off
     }
 
     // MARK: - General Tab
@@ -182,20 +175,6 @@ final class SettingsWindowController {
         item.label = L10n.settingsTabExceptions
 
         let view = NSView(frame: NSRect(x: 0, y: 0, width: 460, height: 600))
-        var y: CGFloat = 586          // y — верх следующего элемента, идём сверху вниз
-
-        // Флаг у курсора (issue #10)
-        let caretFlag = NSButton(checkboxWithTitle: L10n.settingsCaretFlag, target: self, action: #selector(caretFlagChanged))
-        caretFlag.frame = NSRect(x: 20, y: y - 22, width: 420, height: 22)
-        caretFlag.state = SettingsManager.shared.caretFlag ? .on : .off
-        view.addSubview(caretFlag)
-        caretFlagCheckbox = caretFlag
-        y -= 24
-        let cfHint = NSTextField(wrappingLabelWithString: L10n.settingsCaretFlagHint)
-        cfHint.frame = NSRect(x: 40, y: y - 44, width: 400, height: 44)
-        cfHint.font = .systemFont(ofSize: 11); cfHint.textColor = .secondaryLabelColor
-        view.addSubview(cfHint)
-        y -= 52
 
         item.view = view
         return item
@@ -427,12 +406,6 @@ final class SettingsWindowController {
     @objc private func triggerDoubleTapChanged(_ sender: NSButton) {
         SettingsManager.shared.triggerDoubleTap = sender.state == .on
         onTriggerChanged?()
-    }
-
-    @objc private func caretFlagChanged(_ sender: NSButton) {
-        let enabled = sender.state == .on
-        SettingsManager.shared.caretFlag = enabled
-        onCaretFlagChanged?(enabled)
     }
 
     @objc private func debugLogChanged(_ sender: NSButton) {

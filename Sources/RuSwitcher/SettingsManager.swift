@@ -27,7 +27,6 @@ final class SettingsManager: @unchecked Sendable {
         static let autoConvert = "com.ruswitcher.autoConvert"
         static let remoteDesktopMode = "com.ruswitcher.remoteDesktopMode"
         static let keySound = "com.ruswitcher.keySound"
-        static let caretFlag = "com.ruswitcher.caretFlag"
         static let monochromeIcon = "com.ruswitcher.monochromeIcon"
     }
 
@@ -129,12 +128,6 @@ final class SettingsManager: @unchecked Sendable {
     var remoteDesktopMode: Bool {
         get { defaults.bool(forKey: Keys.remoteDesktopMode) }
         set { defaults.set(newValue, forKey: Keys.remoteDesktopMode) }
-    }
-
-    /// issue #10: показывать флаг раскладки у текстовой каретки (бета). По умолчанию ВЫКЛ.
-    var caretFlag: Bool {
-        get { defaults.bool(forKey: Keys.caretFlag) }
-        set { defaults.set(newValue, forKey: Keys.caretFlag) }
     }
 
     /// issue #7: звук раскладки на первой букве после смены раскладки. По умолчанию OFF.
